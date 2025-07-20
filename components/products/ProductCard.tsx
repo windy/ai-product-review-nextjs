@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { Star, ExternalLink, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import SafeImage from '@/components/ui/SafeImage';
 
 interface ProductCardProps {
   product: {
@@ -54,11 +54,12 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       {/* Product Image */}
       <div className='relative h-48 overflow-hidden'>
-        <Image
+        <SafeImage
           src={imageUrl}
           alt={product.name}
-          fill
-          className='object-cover hover:scale-105 transition-transform duration-200'
+          width={400}
+          height={300}
+          className='w-full h-full object-cover hover:scale-105 transition-transform duration-200'
         />
       </div>
 

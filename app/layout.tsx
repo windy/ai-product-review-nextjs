@@ -4,6 +4,7 @@ import { Manrope } from 'next/font/google';
 import { getUser } from '@/lib/db/queries';
 import { SWRConfig } from 'swr';
 import Navigation from '@/components/layout/Navigation';
+import ClientNavigation from '@/components/layout/ClientNavigation';
 
 export const metadata: Metadata = {
   title: 'AI Review Hub - Discover the Best AI Tools',
@@ -36,7 +37,7 @@ export default function RootLayout({
             }
           }}
         >
-          <Navigation />
+          <ClientNavigation />
           {children}
         </SWRConfig>
       </body>

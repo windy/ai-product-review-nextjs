@@ -18,6 +18,7 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash').notNull(),
   avatar: text('avatar'), // URL to user avatar
   bio: text('bio'), // User bio/description
+  role: varchar('role', { length: 20 }).default('user'), // user, admin, moderator
   isVerified: boolean('is_verified').default(false), // Email verification status
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),

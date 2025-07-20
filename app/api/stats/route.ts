@@ -65,7 +65,7 @@ export async function GET() {
         categoryName: categories.name,
         categorySlug: categories.slug,
         productCount: sql<number>`count(*)`,
-        averageRating: sql<number>`ROUND(AVG(CAST(${products.averageRating} AS DECIMAL)), 2)`,
+        averageRating: sql<number | null>`COALESCE(ROUND(AVG(CAST(${products.averageRating} AS DECIMAL)), 2), 0)`,
         totalReviews: sql<number>`SUM(${products.totalReviews})`
       })
       .from(products)

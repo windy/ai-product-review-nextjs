@@ -41,7 +41,7 @@ interface StatsData {
     categoryName: string;
     categorySlug: string;
     productCount: number;
-    averageRating: number;
+    averageRating: number | null;
     totalReviews: number;
   }>;
   recentActivity: Array<{
@@ -294,7 +294,7 @@ export default function StatsPage() {
                   <div className="flex justify-between">
                     <span>Avg Rating:</span>
                     <span className="font-medium">
-                      {category.averageRating ? category.averageRating.toFixed(1) : 'N/A'}
+                      {category.averageRating && typeof category.averageRating === 'number' ? category.averageRating.toFixed(1) : 'N/A'}
                     </span>
                   </div>
                   <div className="flex justify-between">

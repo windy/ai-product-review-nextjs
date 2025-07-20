@@ -104,10 +104,13 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
 
   const passwordHash = await hashPassword(password);
 
+  // Extract a default name from email (username part)
+  const defaultName = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
   const newUser: NewUser = {
     email,
     passwordHash,
-    name: null
+    name: defaultName
   };
 
   const [createdUser] = await db.insert(users).values(newUser).returning();
