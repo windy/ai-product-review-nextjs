@@ -8,14 +8,41 @@ import {
   TrendingUp
 } from 'lucide-react';
 import Link from 'next/link';
+import { db } from '@/lib/db/drizzle';
+import { products } from '@/lib/db/schema';
+import { sql, isNull } from 'drizzle-orm';
+import { requireAdmin } from '@/lib/auth/admin';
 
 async function getAdminStats() {
   try {
-    const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/admin/products?limit=1`);
-    if (!response.ok) return null;
+    await requireAdmin();
     
-    const data = await response.json();
-    return data.counts;
+    // Get status counts
+    const statusCounts = await db
+      .select({
+        status: products.status,
+        count: sql<number>`count(*)`,
+      })
+      .from(products)
+      .where(isNull(products.deletedAt))
+      .groupBy(products.status);
+
+    // Get total count
+    const totalResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(products)
+      .where(isNull(products.deletedAt));
+    
+    const total = totalResult[0]?.count || 0;
+    
+    const counts = {
+      all: total,
+      pending: statusCounts.find(s => s.status === 'pending')?.count || 0,
+      approved: statusCounts.find(s => s.status === 'approved')?.count || 0,
+      rejected: statusCounts.find(s => s.status === 'rejected')?.count || 0,
+    };
+    
+    return counts;
   } catch (error) {
     console.error('Error fetching admin stats:', error);
     return null;

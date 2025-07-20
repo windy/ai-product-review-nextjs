@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { products, categories, users } from '@/lib/db/schema';
-import { eq, desc, and, sql, or, ilike } from 'drizzle-orm';
+import { eq, desc, and, sql, or, ilike, isNull } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/auth/admin';
 
 // GET /api/admin/products - List all products for admin (including pending)
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // Build conditions
-    const conditions = [eq(products.deletedAt, null)]; // Not deleted
+    const conditions = [isNull(products.deletedAt)]; // Not deleted
 
     // Status filter
     if (status !== 'all') {
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         count: sql<number>`count(*)`,
       })
       .from(products)
-      .where(eq(products.deletedAt, null))
+      .where(isNull(products.deletedAt))
       .groupBy(products.status);
 
     const counts = {
@@ -125,6 +125,122 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { error: 'Failed to fetch products' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/admin/products - Update a product
+export async function PUT(request: NextRequest) {
+  try {
+    await requireAdmin();
+
+    const data = await request.json();
+    const { id, name, description, shortDescription, website, pricing, categoryId, isFeatured } = data;
+
+    if (!id || !name || !description) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Update product
+    const result = await db
+      .update(products)
+      .set({
+        name,
+        description,
+        shortDescription,
+        website,
+        pricing,
+        categoryId: parseInt(categoryId),
+        isFeatured: Boolean(isFeatured),
+        updatedAt: new Date(),
+      })
+      .where(eq(products.id, parseInt(id)))
+      .returning();
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Product not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      message: 'Product updated successfully',
+      product: result[0],
+    });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    
+    if (error instanceof Error) {
+      if (error.message === 'Authentication required') {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      }
+      if (error.message === 'Admin access required') {
+        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      }
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update product' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/admin/products - Delete a product (soft delete)
+export async function DELETE(request: NextRequest) {
+  try {
+    await requireAdmin();
+
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Product ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Soft delete product by setting deletedAt
+    const result = await db
+      .update(products)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(products.id, parseInt(id)))
+      .returning();
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Product not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      message: 'Product deleted successfully',
+      product: result[0],
+    });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    
+    if (error instanceof Error) {
+      if (error.message === 'Authentication required') {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      }
+      if (error.message === 'Admin access required') {
+        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+      }
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to delete product' },
       { status: 500 }
     );
   }

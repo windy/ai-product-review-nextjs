@@ -14,7 +14,9 @@ import {
   ExternalLink,
   Eye,
   Calendar,
-  User
+  User,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +70,18 @@ export default function AdminProductsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [categories, setCategories] = useState<Array<{id: number, name: string}>>([]);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    shortDescription: '',
+    website: '',
+    pricing: '',
+    categoryId: '',
+    isFeatured: false
+  });
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -79,7 +93,63 @@ export default function AdminProductsPage() {
   useEffect(() => {
     setSearchTerm(currentSearch);
     fetchProducts();
+    fetchCategories();
   }, [searchParams]);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('/api/categories');
+      if (response.ok) {
+        const result = await response.json();
+        setCategories(result.categories || []);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setEditForm({
+      name: product.name,
+      description: product.description,
+      shortDescription: product.shortDescription || '',
+      website: product.website || '',
+      pricing: product.pricing || '',
+      categoryId: product.category.id.toString(),
+      isFeatured: product.isFeatured
+    });
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct) return;
+
+    setActionLoading(editingProduct.id);
+    
+    try {
+      const response = await fetch('/api/admin/products', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingProduct.id,
+          ...editForm
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update product');
+      
+      // Refresh the products list
+      fetchProducts();
+      setEditingProduct(null);
+    } catch (error) {
+      console.error('Error updating product:', error);
+      alert('Failed to update product. Please try again.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -130,9 +200,9 @@ export default function AdminProductsPage() {
     try {
       const endpoint = action === 'approve' 
         ? `/api/admin/products/${productId}/approve`
-        : `/api/admin/products/${productId}/approve`;
+        : `/api/admin/products/${productId}/reject`;
       
-      const method = action === 'approve' ? 'POST' : 'DELETE';
+      const method = 'POST';
       const body = action === 'reject' ? JSON.stringify({ reason: 'Quality standards not met' }) : undefined;
       
       const response = await fetch(endpoint, {
@@ -148,6 +218,27 @@ export default function AdminProductsPage() {
     } catch (error) {
       console.error(`Error ${action}ing product:`, error);
       alert(`Failed to ${action} product. Please try again.`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    setActionLoading(productId);
+    
+    try {
+      const response = await fetch(`/api/admin/products?id=${productId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete product');
+      
+      // Refresh the products list
+      fetchProducts();
+      setDeletingProduct(null);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      alert('Failed to delete product. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -357,6 +448,22 @@ export default function AdminProductsPage() {
                         <Eye className="h-4 w-4" />
                       </Link>
 
+                      <button
+                        onClick={() => handleEditProduct(product)}
+                        className="text-gray-500 hover:text-blue-600 transition-colors"
+                        title="Edit product"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+
+                      <button
+                        onClick={() => setDeletingProduct(product)}
+                        className="text-gray-500 hover:text-red-600 transition-colors"
+                        title="Delete product"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+
                       {product.status === 'pending' && (
                         <>
                           <Button
@@ -410,6 +517,152 @@ export default function AdminProductsPage() {
             >
               Next
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Edit Product
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name
+                </label>
+                <Input
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                  placeholder="Product name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Short Description
+                </label>
+                <Input
+                  value={editForm.shortDescription}
+                  onChange={(e) => setEditForm({...editForm, shortDescription: e.target.value})}
+                  placeholder="Brief description"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                  placeholder="Detailed description"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Website
+                </label>
+                <Input
+                  value={editForm.website}
+                  onChange={(e) => setEditForm({...editForm, website: e.target.value})}
+                  placeholder="https://example.com"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pricing
+                </label>
+                <Input
+                  value={editForm.pricing}
+                  onChange={(e) => setEditForm({...editForm, pricing: e.target.value})}
+                  placeholder="Free, Paid, Freemium, etc."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={editForm.categoryId}
+                  onChange={(e) => setEditForm({...editForm, categoryId: e.target.value})}
+                >
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isFeatured"
+                  checked={editForm.isFeatured}
+                  onChange={(e) => setEditForm({...editForm, isFeatured: e.target.checked})}
+                  className="rounded"
+                />
+                <label htmlFor="isFeatured" className="ml-2 text-sm text-gray-700">
+                  Featured Product
+                </label>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setEditingProduct(null)}
+                disabled={actionLoading === editingProduct.id}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateProduct}
+                disabled={actionLoading === editingProduct.id}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {actionLoading === editingProduct.id ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Delete Product
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete "{deletingProduct.name}"? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeletingProduct(null)}
+                disabled={actionLoading === deletingProduct.id}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleDeleteProduct(deletingProduct.id)}
+                disabled={actionLoading === deletingProduct.id}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {actionLoading === deletingProduct.id ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
           </div>
         </div>
       )}
